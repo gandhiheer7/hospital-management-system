@@ -1,9 +1,10 @@
 <template>
-  <router-view />
+  <Navbar />
+  <div class="container mt-4">
+    <router-view />
+  </div>
 </template>
 
-<script>
-export default {
-  name: 'App'
-};
+<script setup>
+import Navbar from './components/Navbar.vue'
 </script>

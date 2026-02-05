@@ -1,52 +1,20 @@
 <template>
-  <div class="container mt-5">
-    <div class="row justify-content-center">
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-header">Patient Registration</div>
-          <div class="card-body">
-
-            <div v-if="error" class="alert alert-danger">{{ error }}</div>
-            <div v-if="success" class="alert alert-success">{{ success }}</div>
-
-            <form v-if="!success" @submit.prevent="handleRegister">
-              <div class="mb-3">
-                <label class="form-label">Full Name</label>
-                <input type="text" class="form-control" v-model="form.name" required>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label">Email Address</label>
-                <input type="email" class="form-control" v-model="form.email" required>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label">Password</label>
-                <input type="password" class="form-control" v-model="form.password" required>
-              </div>
-
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Date of Birth</label>
-                  <input type="date" class="form-control" v-model="form.dob">
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Contact Number</label>
-                  <input type="text" class="form-control" v-model="form.contact_info">
-                </div>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label">Address</label>
-                <textarea class="form-control" v-model="form.address" rows="2"></textarea>
-              </div>
-
-              <button type="submit" class="btn btn-primary w-100">Register</button>
-            </form>
-
-            <div class="mt-3 text-center">
-              <p>Already have an account? <router-link to="/login">Login here</router-link></p>
-            </div>
+  <div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+      <div class="card shadow">
+        <div class="card-body">
+          <h3 class="text-center">Register Patient</h3>
+          <form @submit.prevent="register">
+            <div class="mb-2"><label>Name</label><input v-model="form.name" class="form-control" required></div>
+            <div class="mb-2"><label>Email</label><input v-model="form.email" type="email" class="form-control" required></div>
+            <div class="mb-2"><label>Password</label><input v-model="form.password" type="password" class="form-control" required></div>
+            <div class="mb-2"><label>Date of Birth</label><input v-model="form.dob" type="date" class="form-control"></div>
+            <div class="mb-2"><label>Contact</label><input v-model="form.contact_info" class="form-control"></div>
+            <div class="mb-3"><label>Address</label><textarea v-model="form.address" class="form-control"></textarea></div>
+            <button class="btn btn-success w-100">Register</button>
+          </form>
+          <div class="mt-3 text-center">
+             <router-link to="/login">Already have an account? Login</router-link>
           </div>
         </div>
       </div>
@@ -54,42 +22,21 @@
   </div>
 </template>
 
-<script>
-import authService from '../../services/auth';
+<script setup>
+import { reactive } from 'vue';
+import { useRouter } from 'vue-router';
+import api from '../../services/api';
 
-export default {
-  name: 'Register',
-  data() {
-    return {
-      form: {
-        name: '',
-        email: '',
-        password: '',
-        dob: '',
-        contact_info: '',
-        address: ''
-      },
-      error: '',
-      success: ''
-    };
-  },
-  methods: {
-    async handleRegister() {
-      this.error = '';
-      this.success = '';
-      
-      try {
-        await authService.register(this.form);
-        this.success = 'Registration successful! You can now log in.';
-        this.form = {}; // Clear form
-      } catch (err) {
-        if (err.response && err.response.data && err.response.data.message) {
-          this.error = err.response.data.message;
-        } else {
-          this.error = 'Registration failed. Please try again.';
-        }
-      }
-    }
+const router = useRouter();
+const form = reactive({ name: '', email: '', password: '', dob: '', contact_info: '', address: '' });
+
+const register = async () => {
+  try {
+    await api.post('/auth/register', form);
+    alert('Registration successful! Please login.');
+    router.push('/login');
+  } catch (err) {
+    alert(err.response?.data?.message || 'Error');
   }
 };
 </script>

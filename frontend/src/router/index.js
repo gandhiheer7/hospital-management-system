@@ -1,154 +1,47 @@
-import { createRouter, createWebHistory } from 'vue-router';
-
-// Lazy-loaded route components
-const Login = () => import('../views/auth/Login.vue');
-const Register = () => import('../views/auth/Register.vue');
-
-// Admin Views
-const AdminDashboard = () => import('../views/admin/AdminDashboard.vue');
-const ManageDoctors = () => import('../views/admin/ManageDoctors.vue');
-const ManagePatients = () => import('../views/admin/ManagePatients.vue');
-
-// Doctor Views
-const DoctorDashboard = () => import('../views/doctor/DoctorDashboard.vue');
-//const DoctorSchedule = () => import('../views/doctor/DoctorSchedule.vue');
-
-// Patient Views
-const PatientDashboard = () => import('../views/patient/PatientDashboard.vue');
-const BookAppointment = () => import('../views/patient/BookAppointment.vue');
-const MedicalHistory = () => import('../views/patient/MedicalHistory.vue');
-
-// System Views
-const NotFound = { template: '<div>404 Not Found</div>' };
+import { createRouter, createWebHistory } from 'vue-router'
+import Login from '../views/auth/Login.vue'
+import Register from '../views/auth/Register.vue'
+import AdminDashboard from '../views/admin/AdminDashboard.vue'
+import ManageDoctors from '../views/admin/ManageDoctors.vue'
+import ManagePatients from '../views/admin/ManagePatients.vue'
+import DoctorDashboard from '../views/doctor/DoctorDashboard.vue'
+import PatientDashboard from '../views/patient/PatientDashboard.vue'
+import BookAppointment from '../views/patient/BookAppointment.vue'
+import MedicalHistory from '../views/patient/MedicalHistory.vue'
+import Profile from '../views/patient/Profile.vue'
 
 const routes = [
-  // Authentication
-  {
-    path: '/login',
-    name: 'Login',
-    component: Login,
-    meta: { guest: true }
-  },
-  {
-    path: '/register',
-    name: 'Register',
-    component: Register,
-    meta: { guest: true }
-  },
+  { path: '/', redirect: '/login' },
+  { path: '/login', component: Login },
+  { path: '/register', component: Register },
+  
+  // Admin
+  { path: '/admin', component: AdminDashboard, meta: { role: 'admin' } },
+  { path: '/admin/doctors', component: ManageDoctors, meta: { role: 'admin' } },
+  { path: '/admin/patients', component: ManagePatients, meta: { role: 'admin' } },
 
-  // Admin Routes
-  {
-    path: '/admin/dashboard',
-    name: 'AdminDashboard',
-    component: AdminDashboard,
-    meta: { auth: true, role: 'admin' }
-  },
-  {
-    path: '/admin/doctors',
-    name: 'ManageDoctors',
-    component: ManageDoctors,
-    meta: { auth: true, role: 'admin' }
-  },
-  {
-    path: '/admin/patients',
-    name: 'ManagePatients',
-    component: ManagePatients,
-    meta: { auth: true, role: 'admin' }
-  },
+  // Doctor
+  { path: '/doctor', component: DoctorDashboard, meta: { role: 'doctor' } },
 
-  // Doctor Routes
-  {
-    path: '/doctor/dashboard',
-    name: 'DoctorDashboard',
-    component: DoctorDashboard,
-    meta: { auth: true, role: 'doctor' }
-  },
-  /*{
-    path: '/doctor/schedule',
-    name: 'DoctorSchedule',
-    component: DoctorSchedule,
-    meta: { auth: true, role: 'doctor' }
-  },*/
-
-  // Patient Routes
-  {
-    path: '/patient/dashboard',
-    name: 'PatientDashboard',
-    component: PatientDashboard,
-    meta: { auth: true, role: 'patient' }
-  },
-  {
-    path: '/patient/book',
-    name: 'BookAppointment',
-    component: BookAppointment,
-    meta: { auth: true, role: 'patient' }
-  },
-  {
-    path: '/patient/history',
-    name: 'MedicalHistory',
-    component: MedicalHistory,
-    meta: { auth: true, role: 'patient' }
-  },
-
-  // Root Redirect
-  {
-    path: '/',
-    name: 'Root',
-    redirect: () => {
-      const role = localStorage.getItem('user_role');
-      const allowedRoles = ['admin', 'doctor', 'patient'];
-
-      if (allowedRoles.includes(role)) {
-        return `/${role}/dashboard`;
-      }
-      return '/login';
-    }
-  },
-
-  // Catch-all
-  {
-    path: '/:pathMatch(.*)*',
-    name: 'NotFound',
-    component: NotFound
-  }
-];
+  // Patient
+  { path: '/patient', component: PatientDashboard, meta: { role: 'patient' } },
+  { path: '/patient/book', component: BookAppointment, meta: { role: 'patient' } },
+  { path: '/patient/history', component: MedicalHistory, meta: { role: 'patient' } },
+  { path: '/patient/profile', component: Profile, meta: { role: 'patient' } }
+]
 
 const router = createRouter({
   history: createWebHistory(),
   routes
-});
+})
 
-// Navigation Guards
+// Simple Role Guard
 router.beforeEach((to, from, next) => {
-  const userRole = localStorage.getItem('user_role');
-  const isLoggedIn = !!userRole;
-  const allowedRoles = ['admin', 'doctor', 'patient'];
-
-  // 1️⃣ Auth required but user not logged in
-  if (to.meta.auth && !isLoggedIn) {
+  const role = localStorage.getItem('role');
+  if (to.meta.role && to.meta.role !== role) {
     return next('/login');
   }
-
-  // 2️⃣ Guest-only routes (login/register)
-  if (to.meta.guest && isLoggedIn) {
-    if (allowedRoles.includes(userRole)) {
-      return next(`/${userRole}/dashboard`);
-    }
-    return next('/login');
-  }
-
-  // 3️⃣ Role-based authorization
-  if (to.meta.role) {
-    if (!allowedRoles.includes(userRole)) {
-      return next('/login');
-    }
-
-    if (userRole !== to.meta.role) {
-      return next(`/${userRole}/dashboard`);
-    }
-  }
-
   next();
 });
 
-export default router;
+export default router

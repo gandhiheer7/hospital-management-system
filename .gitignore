@@ -13,3 +13,9 @@ dist/
 
 # OS
 .DS_Store
+
+redis/
+
+backend/instance/hospital.db
+
+backend/celerybeat-schedule*

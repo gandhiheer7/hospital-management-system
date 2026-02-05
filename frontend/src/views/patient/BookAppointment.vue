@@ -1,258 +1,140 @@
 <template>
-  <div class="container mt-4">
-    <h2>Book an Appointment</h2>
-    <p class="text-muted">
-      Select a doctor, choose a date, and pick an available time slot.
-    </p>
-
-    <!-- Success -->
-    <div
-      v-if="successMessage"
-      class="alert alert-success alert-dismissible fade show"
-      role="alert"
-    >
-      {{ successMessage }}
-      <button type="button" class="btn-close" @click="successMessage = ''"></button>
-    </div>
-
-    <!-- Error -->
-    <div v-if="errorMessage" class="alert alert-danger" role="alert">
-      {{ errorMessage }}
-    </div>
-
-    <!-- Loading -->
-    <div v-if="loading" class="text-center py-5">
-      <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Loading...</span>
+  <div>
+    <h3>Book Appointment</h3>
+    
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <label>Filter by Specialization</label>
+        <select v-model="selectedDept" @change="fetchDoctors" class="form-select">
+          <option value="">All Departments</option>
+          <option v-for="d in departments" :key="d.id" :value="d.id">{{ d.name }}</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label>Search Doctor</label>
+        <input v-model="searchQuery" class="form-control" placeholder="Search by doctor name..." />
       </div>
     </div>
 
-    <!-- Form -->
-    <div v-else class="card">
-      <div class="card-body">
-        <form @submit.prevent="submitBooking">
-
-          <!-- Doctor -->
-          <div class="mb-3">
-            <label class="form-label">
-              Select Doctor <span class="text-danger">*</span>
-            </label>
-            <select
-              class="form-select"
-              v-model="form.doctor_id"
-              @change="onDoctorChange"
-              required
-            >
-              <option value="" disabled>-- Choose a Doctor --</option>
-              <option
-                v-for="doc in doctors"
-                :key="doc.id"
-                :value="doc.id"
-              >
-                Dr. {{ doc.name }} ({{ doc.specialization }})
-              </option>
-            </select>
-          </div>
-
-          <!-- Date -->
-          <div class="mb-3">
-            <label class="form-label">
-              Appointment Date <span class="text-danger">*</span>
-            </label>
-            <input
-              type="date"
-              class="form-control"
-              v-model="form.date"
-              :min="minDate"
-              :max="maxDate"
-              @change="updateAvailableSlots"
-              required
-            >
-            <div class="form-text">
-              Appointments can be booked up to 7 days in advance.
+    <div class="row">
+      <div class="col-md-6 mb-3" v-for="doc in filteredDoctors" :key="doc.id">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title text-primary">{{ doc.name }}</h5>
+            <h6 class="card-subtitle mb-2 text-muted">{{ doc.specialization }}</h6>
+            <hr>
+            <h6>Availability:</h6>
+            <div v-if="Object.keys(doc.availability).length">
+               <div v-for="(times, day) in doc.availability" :key="day" class="mb-1">
+                 <strong>{{ day }} ({{ getNextDate(day) }}):</strong> 
+                 <span v-for="t in times" :key="t" 
+                       class="badge bg-light text-dark border ms-1 cursor-pointer hover-bg-primary"
+                       @click="selectSlot(doc.id, day, t)">
+                   {{ t }}
+                 </span>
+               </div>
             </div>
+            <div v-else class="text-muted small">No schedule available.</div>
           </div>
-
-          <!-- Slots -->
-          <div class="mb-4">
-            <label class="form-label">
-              Available Time Slots <span class="text-danger">*</span>
-            </label>
-
-            <div v-if="!form.doctor_id || !form.date" class="text-muted fst-italic">
-              Please select a doctor and date to view available slots.
-            </div>
-
-            <div
-              v-else-if="availableSlots.length === 0"
-              class="alert alert-warning py-2"
-            >
-              No slots available for {{ formattedDate }}.
-            </div>
-
-            <div v-else class="d-flex flex-wrap gap-2">
-              <template v-for="slot in availableSlots" :key="slot">
-                <input
-                  type="radio"
-                  class="btn-check"
-                  name="timeSlot"
-                  :id="'slot-' + slot"
-                  :value="slot"
-                  v-model="form.time_slot"
-                >
-                <label
-                  class="btn btn-outline-primary"
-                  :for="'slot-' + slot"
-                >
-                  {{ slot }}
-                </label>
-              </template>
-            </div>
-          </div>
-
-          <!-- Submit -->
-          <div class="d-grid">
-            <button
-              type="submit"
-              class="btn btn-success"
-              :disabled="submitting || !isFormValid"
-            >
-              <span
-                v-if="submitting"
-                class="spinner-border spinner-border-sm me-2"
-              ></span>
-              {{ submitting ? 'Booking...' : 'Confirm Appointment' }}
-            </button>
-          </div>
-
-        </form>
+        </div>
       </div>
     </div>
+
+    <div v-if="selectedSlot" class="alert alert-info mt-3 position-fixed bottom-0 end-0 m-3 shadow" style="z-index: 1000; min-width: 300px;">
+      <h5>Confirm Booking</h5>
+      <p><strong>Doctor:</strong> {{ getDoctorName(selectedSlot.doctorId) }}</p>
+      <p><strong>Time:</strong> {{ selectedSlot.time }}</p>
+      
+      <label>Date (YYYY-MM-DD):</label>
+      <input v-model="bookingDate" type="date" class="form-control mb-2" readonly />
+      
+      <div class="d-flex gap-2">
+        <button @click="confirmBooking" class="btn btn-success flex-grow-1">Confirm</button>
+        <button @click="selectedSlot = null" class="btn btn-secondary flex-grow-1">Cancel</button>
+      </div>
+    </div>
+
   </div>
 </template>
 
-<script>
-import apiClient from '../../services/api';
+<script setup>
+import { ref, computed, onMounted } from 'vue';
+import api from '../../services/api';
 
-export default {
-  name: 'BookAppointment',
+const departments = ref([]);
+const doctors = ref([]);
+const selectedDept = ref('');
+const searchQuery = ref('');
+const selectedSlot = ref(null);
+const bookingDate = ref('');
 
-  data() {
-    const today = new Date();
-    const max = new Date();
-    max.setDate(today.getDate() + 7);
+onMounted(async () => {
+  try {
+    const deptRes = await api.get('/patient/departments');
+    departments.value = deptRes.data;
+    fetchDoctors();
+  } catch (e) {
+    console.error("Error loading data", e);
+  }
+});
 
-    return {
-      doctors: [],
-      loading: true,
-      submitting: false,
-      errorMessage: '',
-      successMessage: '',
-      availableSlots: [],
-      minDate: today.toISOString().split('T')[0],
-      maxDate: max.toISOString().split('T')[0],
-      form: {
-        doctor_id: '',
-        date: '',
-        time_slot: ''
-      }
-    };
-  },
+const fetchDoctors = async () => {
+  const url = selectedDept.value ? `/patient/doctors?specialization_id=${selectedDept.value}` : '/patient/doctors';
+  const res = await api.get(url);
+  doctors.value = res.data;
+};
 
-  computed: {
-    isFormValid() {
-      return (
-        this.form.doctor_id &&
-        this.form.date &&
-        this.form.time_slot
-      );
-    },
-    formattedDate() {
-      if (!this.form.date) return '';
-      return new Date(this.form.date).toLocaleDateString(undefined, {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    }
-  },
+// Client-side Search Logic
+const filteredDoctors = computed(() => {
+  if (!searchQuery.value) return doctors.value;
+  return doctors.value.filter(d => d.name.toLowerCase().includes(searchQuery.value.toLowerCase()));
+});
 
-  mounted() {
-    this.fetchDoctors();
-  },
+// Helper to get next upcoming date for a given day name
+const getNextDate = (dayName) => {
+  const dayMap = { "Sunday": 0, "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6 };
+  if (!(dayName in dayMap)) return ""; 
 
-  methods: {
-    async fetchDoctors() {
-      this.loading = true;
-      this.errorMessage = '';
+  const targetDayIdx = dayMap[dayName];
+  const date = new Date();
+  const currentDayIdx = date.getDay();
+  
+  let daysToAdd = targetDayIdx - currentDayIdx;
+  if (daysToAdd <= 0) daysToAdd += 7; // Always next occurrence (1-7 days away)
 
-      try {
-        const { data } = await apiClient.get('/patient/doctors');
-        this.doctors = Array.isArray(data) ? data : [];
-      } catch (err) {
-        console.error(err);
-        this.errorMessage = 'Failed to load doctors list.';
-      } finally {
-        this.loading = false;
-      }
-    },
+  date.setDate(date.getDate() + daysToAdd);
+  return date.toISOString().split('T')[0];
+};
 
-    onDoctorChange() {
-      this.availableSlots = [];
-      this.form.time_slot = '';
-      if (this.form.date) {
-        this.updateAvailableSlots();
-      }
-    },
+const getDoctorName = (id) => {
+  const doc = doctors.value.find(d => d.id === id);
+  return doc ? doc.name : 'Unknown';
+};
 
-    updateAvailableSlots() {
-      this.availableSlots = [];
-      this.form.time_slot = '';
+const selectSlot = (doctorId, day, time) => {
+  // Auto-fill the date based on the day clicked
+  const dateStr = getNextDate(day);
+  bookingDate.value = dateStr;
+  selectedSlot.value = { doctorId, day, time };
+};
 
-      if (!this.form.doctor_id || !this.form.date) return;
-
-      const doctor = this.doctors.find(
-        d => String(d.id) === String(this.form.doctor_id)
-      );
-      if (!doctor || !doctor.availability) return;
-
-      const dayName = new Date(this.form.date).toLocaleDateString('en-US', {
-        weekday: 'long'
-      });
-
-      if (Array.isArray(doctor.availability[dayName])) {
-        this.availableSlots = doctor.availability[dayName];
-      }
-    },
-
-    async submitBooking() {
-      if (!this.isFormValid) return;
-
-      this.submitting = true;
-      this.errorMessage = '';
-      this.successMessage = '';
-
-      try {
-        await apiClient.post('/patient/book', { ...this.form });
-
-        this.successMessage = 'Appointment booked successfully!';
-        this.form = { doctor_id: '', date: '', time_slot: '' };
-        this.availableSlots = [];
-
-        setTimeout(() => {
-          this.$router.push('/patient/dashboard');
-        }, 1500);
-
-      } catch (err) {
-        console.error(err);
-        this.errorMessage =
-          err?.response?.data?.message ||
-          'Failed to book appointment. Please try again.';
-      } finally {
-        this.submitting = false;
-      }
-    }
+const confirmBooking = async () => {
+  if (!bookingDate.value) return alert('Error: Date missing');
+  try {
+    await api.post('/patient/book', {
+      doctor_id: selectedSlot.value.doctorId,
+      date: bookingDate.value,
+      time_slot: selectedSlot.value.time
+    });
+    alert('Booking Confirmed!');
+    selectedSlot.value = null;
+  } catch (err) {
+    alert(err.response?.data?.message || 'Failed');
   }
 };
 </script>
+
+<style scoped>
+.cursor-pointer { cursor: pointer; }
+.hover-bg-primary:hover { background-color: #0d6efd !important; color: white !important; }
+</style>
