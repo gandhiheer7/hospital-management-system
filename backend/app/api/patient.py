@@ -1,22 +1,19 @@
 import json
 from flask import Blueprint, request, jsonify, session
-from datetime import datetime
-from ..models import db, Patient, Doctor, Appointment, Department  # <--- Added Department
+from datetime import datetime, date
+from ..models import db, Patient, Doctor, Appointment, Department
 from .decorators import patient_required
 from ..tasks import export_patient_history
 from .. import cache
 
 patient_bp = Blueprint('patient', __name__)
 
-# --- NEW ENDPOINT ADDED ---
 @patient_bp.route('/departments', methods=['GET'])
 @patient_required
 def get_departments():
-    """Allow patients to fetch departments for the filter dropdown"""
     departments = Department.query.all()
     output = [{'id': d.id, 'name': d.name} for d in departments]
     return jsonify(output), 200
-# --------------------------
 
 @patient_bp.route('/doctors', methods=['GET'])
 @patient_required
@@ -75,6 +72,26 @@ def book_appointment():
     db.session.add(new_appt)
     db.session.commit()
     return jsonify({'message': 'Booked successfully'}), 201
+
+# --- NEW FEATURE: Cancel Appointment ---
+@patient_bp.route('/appointments/<int:id>/cancel', methods=['PUT'])
+@patient_required
+def cancel_appointment(id):
+    user_id = session.get('user_id')
+    patient = Patient.query.filter_by(user_id=user_id).first()
+    
+    appt = Appointment.query.filter_by(id=id, patient_id=patient.id).first()
+    
+    if not appt:
+        return jsonify({'message': 'Appointment not found'}), 404
+        
+    if appt.status == 'Completed':
+        return jsonify({'message': 'Cannot cancel completed appointments'}), 400
+        
+    appt.status = 'Cancelled'
+    db.session.commit()
+    return jsonify({'message': 'Appointment cancelled'}), 200
+# ---------------------------------------
 
 @patient_bp.route('/dashboard', methods=['GET'])
 @patient_required

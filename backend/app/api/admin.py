@@ -64,7 +64,6 @@ def add_doctor():
 @admin_bp.route('/doctors/<int:doctor_id>', methods=['PUT'])
 @admin_required
 def update_doctor(doctor_id):
-    """Update Doctor Details (Name, Specialization)"""
     doctor = Doctor.query.get(doctor_id)
     if not doctor: return jsonify({'message': 'Doctor not found'}), 404
     
@@ -78,12 +77,8 @@ def update_doctor(doctor_id):
 @admin_bp.route('/doctors/<int:doctor_id>', methods=['DELETE'])
 @admin_required
 def delete_doctor(doctor_id):
-    """Hard Delete Doctor"""
     doctor = Doctor.query.get(doctor_id)
     if not doctor: return jsonify({'message': 'Doctor not found'}), 404
-    
-    # Note: Cascading delete handles the User record if configured, 
-    # but manually deleting User is safer for clarity.
     user = doctor.user
     db.session.delete(doctor)
     db.session.delete(user)
@@ -118,6 +113,21 @@ def get_all_patients():
     } for p in patients]
     return jsonify(output), 200
 
+# --- NEW FEATURE: Edit Patient Info ---
+@admin_bp.route('/patients/<int:patient_id>', methods=['PUT'])
+@admin_required
+def update_patient(patient_id):
+    patient = Patient.query.get(patient_id)
+    if not patient: return jsonify({'message': 'Patient not found'}), 404
+    
+    data = request.get_json()
+    if 'name' in data: patient.name = data['name']
+    if 'contact_info' in data: patient.contact_info = data['contact_info']
+    
+    db.session.commit()
+    return jsonify({'message': 'Patient updated'}), 200
+# --------------------------------------
+
 @admin_bp.route('/patients/<int:patient_id>/block', methods=['PUT'])
 @admin_required
 def block_patient(patient_id):
@@ -142,3 +152,15 @@ def view_all_appointments():
         'status': apt.status
     } for apt in appointments]
     return jsonify(output), 200
+
+# --- NEW FEATURE: Admin Cancel Appointment ---
+@admin_bp.route('/appointments/<int:id>/cancel', methods=['PUT'])
+@admin_required
+def cancel_appointment(id):
+    appt = Appointment.query.get(id)
+    if not appt: return jsonify({'message': 'Not found'}), 404
+    
+    appt.status = 'Cancelled'
+    db.session.commit()
+    return jsonify({'message': 'Appointment cancelled'}), 200
+# ---------------------------------------------

@@ -19,3 +19,9 @@ redis/
 backend/instance/hospital.db
 
 backend/celerybeat-schedule*
+
+redis/
+
+backend/instance/*.db
+
+backend/celerybeat-schedule*

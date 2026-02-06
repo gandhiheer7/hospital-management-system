@@ -2,7 +2,7 @@
   <div>
     <h3>Doctor Dashboard</h3>
     
-    <div class="card mb-4">
+    <div class="card mb-4 shadow-sm">
       <div class="card-body">
          <h5>Update Availability</h5>
          <p class="small text-muted">Format: JSON {"Monday": ["09:00", "10:00"]}</p>
@@ -12,13 +12,17 @@
     </div>
 
     <h4>Assigned Appointments</h4>
+    <div v-if="appointments.length === 0" class="alert alert-light">No appointments found.</div>
+    
     <div v-for="apt in appointments" :key="apt.id" class="card mb-2 border-primary">
-      <div class="card-body d-flex justify-content-between">
+      <div class="card-body d-flex justify-content-between align-items-center">
         <div>
           <h5>{{ apt.patient_name }}</h5>
-          <p>{{ apt.date }} at {{ apt.time_slot }}</p>
+          <p class="mb-1">{{ apt.date }} at {{ apt.time_slot }}</p>
+          <span class="badge bg-info">{{ apt.status }}</span>
         </div>
         <div>
+          <button @click="viewHistory(apt.patient_id)" class="btn btn-outline-dark me-2">History</button>
           <button @click="openCompleteModal(apt)" class="btn btn-success">Complete Visit</button>
         </div>
       </div>
@@ -41,6 +45,31 @@
        </div>
     </div>
 
+    <div v-if="selectedPatientHistory" class="modal d-block" style="background: rgba(0,0,0,0.5)">
+       <div class="modal-dialog modal-lg">
+         <div class="modal-content">
+           <div class="modal-header">
+               <h5>Medical History: {{ selectedPatientName }}</h5>
+               <button @click="selectedPatientHistory=null" class="btn-close"></button>
+           </div>
+           <div class="modal-body">
+             <div v-if="selectedPatientHistory.length === 0">No past records found.</div>
+             <ul class="list-group">
+                 <li v-for="(rec, idx) in selectedPatientHistory" :key="idx" class="list-group-item">
+                     <strong>Date:</strong> {{ rec.date }} <br>
+                     <strong>Doctor:</strong> {{ rec.doctor_name }} <br>
+                     <strong>Diagnosis:</strong> {{ rec.diagnosis }} <br>
+                     <strong>Prescription:</strong> {{ rec.prescription }}
+                 </li>
+             </ul>
+           </div>
+           <div class="modal-footer">
+             <button @click="selectedPatientHistory=null" class="btn btn-secondary">Close</button>
+           </div>
+         </div>
+       </div>
+    </div>
+
   </div>
 </template>
 
@@ -53,6 +82,10 @@ const scheduleJson = ref('{}');
 const selectedApt = ref(null);
 const treatment = reactive({ diagnosis: '', prescription: '', notes: '' });
 
+// History State
+const selectedPatientHistory = ref(null);
+const selectedPatientName = ref('');
+
 const fetchDashboard = async () => {
   const res = await api.get('/doctor/dashboard');
   appointments.value = res.data.appointments;
@@ -60,7 +93,7 @@ const fetchDashboard = async () => {
 
 const updateSchedule = async () => {
   try {
-    const json = JSON.parse(scheduleJson.value); // Validate JSON
+    const json = JSON.parse(scheduleJson.value);
     await api.put('/doctor/availability', { schedule: json });
     alert('Availability updated');
   } catch (e) {
@@ -70,6 +103,17 @@ const updateSchedule = async () => {
 
 const openCompleteModal = (apt) => {
   selectedApt.value = apt;
+};
+
+// NEW: Fetch and Show History
+const viewHistory = async (patientId) => {
+    try {
+        const res = await api.get(`/doctor/patient/${patientId}/history`);
+        selectedPatientHistory.value = res.data.history;
+        selectedPatientName.value = res.data.patient_name;
+    } catch (e) {
+        alert('Could not load history');
+    }
 };
 
 const submitTreatment = async () => {

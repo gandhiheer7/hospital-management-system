@@ -4,7 +4,7 @@
 
     <div class="row mt-4">
       <div class="col-md-6">
-        <div class="card">
+        <div class="card shadow-sm h-100">
           <div class="card-header bg-info text-white">Find Care</div>
           <div class="card-body">
             <p>Browse specialists and book your visit.</p>
@@ -13,7 +13,7 @@
         </div>
       </div>
       <div class="col-md-6">
-        <div class="card">
+        <div class="card shadow-sm h-100">
           <div class="card-header bg-warning">Actions</div>
           <div class="card-body">
             <router-link to="/patient/history" class="btn btn-outline-dark me-2">View History</router-link>
@@ -31,7 +31,10 @@
           <strong>Dr. {{ apt.doctor_name }}</strong> <br>
           <small>{{ apt.date }} at {{ apt.time_slot }}</small>
         </div>
-        <span class="badge bg-primary">{{ apt.status }}</span>
+        <div class="d-flex gap-2">
+           <span class="badge bg-primary">{{ apt.status }}</span>
+           <button v-if="apt.status === 'Booked'" @click="cancelAppointment(apt.id)" class="btn btn-sm btn-danger">Cancel</button>
+        </div>
       </li>
     </ul>
   </div>
@@ -43,8 +46,21 @@ import api from '../../services/api';
 
 const data = ref(null);
 
-onMounted(async () => {
+const fetchData = async () => {
   const res = await api.get('/patient/dashboard');
   data.value = res.data;
-});
+};
+
+const cancelAppointment = async (id) => {
+    if(!confirm('Are you sure you want to cancel this appointment?')) return;
+    try {
+        await api.put(`/patient/appointments/${id}/cancel`);
+        alert('Appointment Cancelled');
+        fetchData();
+    } catch (err) {
+        alert(err.response?.data?.message || 'Error');
+    }
+};
+
+onMounted(fetchData);
 </script>
