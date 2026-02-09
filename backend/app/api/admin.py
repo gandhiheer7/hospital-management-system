@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from werkzeug.security import generate_password_hash
-from ..models import db, User, Doctor, Patient, Appointment, Department
+from ..models import db, User, Doctor, Patient, Appointment, Department, Treatment
 from .decorators import admin_required
 
 admin_bp = Blueprint('admin', __name__)
@@ -74,16 +74,33 @@ def update_doctor(doctor_id):
     db.session.commit()
     return jsonify({'message': 'Doctor updated successfully'}), 200
 
+# --- FIX: Cascading Delete ---
 @admin_bp.route('/doctors/<int:doctor_id>', methods=['DELETE'])
 @admin_required
 def delete_doctor(doctor_id):
     doctor = Doctor.query.get(doctor_id)
     if not doctor: return jsonify({'message': 'Doctor not found'}), 404
+    
+    # 1. Delete associated appointments and treatments
+    appointments = Appointment.query.filter_by(doctor_id=doctor.id).all()
+    for apt in appointments:
+        if apt.treatment:
+            db.session.delete(apt.treatment)
+        db.session.delete(apt)
+    
+    # 2. Delete User account
     user = doctor.user
     db.session.delete(doctor)
-    db.session.delete(user)
-    db.session.commit()
-    return jsonify({'message': 'Doctor deleted'}), 200
+    if user:
+        db.session.delete(user)
+        
+    try:
+        db.session.commit()
+        return jsonify({'message': 'Doctor deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': str(e)}), 500
+# -----------------------------
 
 @admin_bp.route('/doctors/<int:doctor_id>/status', methods=['PUT'])
 @admin_required
@@ -113,7 +130,6 @@ def get_all_patients():
     } for p in patients]
     return jsonify(output), 200
 
-# --- NEW FEATURE: Edit Patient Info ---
 @admin_bp.route('/patients/<int:patient_id>', methods=['PUT'])
 @admin_required
 def update_patient(patient_id):
@@ -126,7 +142,6 @@ def update_patient(patient_id):
     
     db.session.commit()
     return jsonify({'message': 'Patient updated'}), 200
-# --------------------------------------
 
 @admin_bp.route('/patients/<int:patient_id>/block', methods=['PUT'])
 @admin_required
@@ -138,6 +153,27 @@ def block_patient(patient_id):
     patient.is_blocked = is_blocked
     db.session.commit()
     return jsonify({'message': 'Status updated'}), 200
+
+# --- NEW: Admin View Patient History ---
+@admin_bp.route('/patients/<int:patient_id>/history', methods=['GET'])
+@admin_required
+def get_patient_history(patient_id):
+    """View past treatments of a specific patient"""
+    patient = Patient.query.get(patient_id)
+    if not patient: return jsonify({'message': 'Patient not found'}), 404
+
+    history = Appointment.query.filter_by(patient_id=patient_id, status='Completed').all()
+    output = []
+    for apt in history:
+        if apt.treatment:
+            output.append({
+                'date': apt.date.isoformat(),
+                'doctor_name': apt.doctor.name,
+                'diagnosis': apt.treatment.diagnosis,
+                'prescription': apt.treatment.prescription
+            })
+    return jsonify(output), 200
+# ---------------------------------------
 
 @admin_bp.route('/appointments', methods=['GET'])
 @admin_required
@@ -153,7 +189,6 @@ def view_all_appointments():
     } for apt in appointments]
     return jsonify(output), 200
 
-# --- NEW FEATURE: Admin Cancel Appointment ---
 @admin_bp.route('/appointments/<int:id>/cancel', methods=['PUT'])
 @admin_required
 def cancel_appointment(id):
@@ -163,4 +198,3 @@ def cancel_appointment(id):
     appt.status = 'Cancelled'
     db.session.commit()
     return jsonify({'message': 'Appointment cancelled'}), 200
-# ---------------------------------------------

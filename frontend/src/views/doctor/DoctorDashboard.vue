@@ -11,10 +11,10 @@
       </div>
     </div>
 
-    <h4>Assigned Appointments</h4>
-    <div v-if="appointments.length === 0" class="alert alert-light">No appointments found.</div>
+    <h4 class="text-primary">1. Upcoming Appointments</h4>
+    <div v-if="upcomingAppointments.length === 0" class="alert alert-light mb-4">No upcoming appointments.</div>
     
-    <div v-for="apt in appointments" :key="apt.id" class="card mb-2 border-primary">
+    <div v-for="apt in upcomingAppointments" :key="apt.id" class="card mb-3 border-primary shadow-sm">
       <div class="card-body d-flex justify-content-between align-items-center">
         <div>
           <h5>{{ apt.patient_name }}</h5>
@@ -22,10 +22,39 @@
           <span class="badge bg-info">{{ apt.status }}</span>
         </div>
         <div>
-          <button @click="viewHistory(apt.patient_id)" class="btn btn-outline-dark me-2">History</button>
           <button @click="openCompleteModal(apt)" class="btn btn-success">Complete Visit</button>
         </div>
       </div>
+    </div>
+
+    <hr class="my-5">
+
+    <h4 class="text-success">2. Assigned Patients (Treated)</h4>
+    <div v-if="assignedPatients.length === 0" class="alert alert-light">No patients treated yet.</div>
+    
+    <div class="table-responsive" v-else>
+        <table class="table table-bordered table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>Patient Name</th>
+                    <th>Contact</th>
+                    <th>Last Visit</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="p in assignedPatients" :key="p.patient_id">
+                    <td>{{ p.patient_name }}</td>
+                    <td>{{ p.contact }}</td>
+                    <td>{{ p.last_visit }}</td>
+                    <td>
+                        <button @click="viewHistory(p.patient_id, p.patient_name)" class="btn btn-sm btn-outline-dark">
+                            View Full History
+                        </button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
     
     <div v-if="selectedApt" class="modal d-block" style="background: rgba(0,0,0,0.5)">
@@ -77,7 +106,8 @@
 import { ref, reactive, onMounted } from 'vue';
 import api from '../../services/api';
 
-const appointments = ref([]);
+const upcomingAppointments = ref([]);
+const assignedPatients = ref([]);
 const scheduleJson = ref('{}');
 const selectedApt = ref(null);
 const treatment = reactive({ diagnosis: '', prescription: '', notes: '' });
@@ -88,7 +118,8 @@ const selectedPatientName = ref('');
 
 const fetchDashboard = async () => {
   const res = await api.get('/doctor/dashboard');
-  appointments.value = res.data.appointments;
+  upcomingAppointments.value = res.data.upcoming_appointments;
+  assignedPatients.value = res.data.assigned_patients; // New Data
 };
 
 const updateSchedule = async () => {
@@ -105,12 +136,12 @@ const openCompleteModal = (apt) => {
   selectedApt.value = apt;
 };
 
-// NEW: Fetch and Show History
-const viewHistory = async (patientId) => {
+// View History for Assigned Patient
+const viewHistory = async (patientId, name) => {
     try {
         const res = await api.get(`/doctor/patient/${patientId}/history`);
         selectedPatientHistory.value = res.data.history;
-        selectedPatientName.value = res.data.patient_name;
+        selectedPatientName.value = name;
     } catch (e) {
         alert('Could not load history');
     }

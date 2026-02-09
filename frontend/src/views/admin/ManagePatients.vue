@@ -27,7 +27,7 @@
             </span>
           </td>
           <td>
-            <button @click="openEdit(p)" class="btn btn-sm btn-info me-1">Edit</button>
+            <button @click="openHistory(p)" class="btn btn-sm btn-dark me-1">History</button> <button @click="openEdit(p)" class="btn btn-sm btn-info me-1">Edit</button>
             
             <button v-if="!p.is_blocked" @click="toggleBlock(p.id, true)" class="btn btn-sm btn-danger">Block</button>
             <button v-else @click="toggleBlock(p.id, false)" class="btn btn-sm btn-secondary">Unblock</button>
@@ -54,6 +54,31 @@
        </div>
     </div>
 
+    <div v-if="viewingHistory" class="modal d-block" style="background: rgba(0,0,0,0.5)">
+       <div class="modal-dialog modal-lg">
+         <div class="modal-content">
+           <div class="modal-header">
+               <h5>Medical History: {{ viewingHistory.name }}</h5>
+               <button @click="viewingHistory=null" class="btn-close"></button>
+           </div>
+           <div class="modal-body">
+             <div v-if="historyData.length === 0">No past records found.</div>
+             <ul class="list-group">
+                 <li v-for="(rec, idx) in historyData" :key="idx" class="list-group-item">
+                     <strong>Date:</strong> {{ rec.date }} <br>
+                     <strong>Doctor:</strong> {{ rec.doctor_name }} <br>
+                     <strong>Diagnosis:</strong> {{ rec.diagnosis }} <br>
+                     <strong>Prescription:</strong> {{ rec.prescription }}
+                 </li>
+             </ul>
+           </div>
+           <div class="modal-footer">
+             <button @click="viewingHistory=null" class="btn btn-secondary">Close</button>
+           </div>
+         </div>
+       </div>
+    </div>
+
   </div>
 </template>
 
@@ -65,12 +90,16 @@ const patients = ref([]);
 const searchQuery = ref('');
 const editingPatient = ref(null);
 
+// History State
+const viewingHistory = ref(null);
+const historyData = ref([]);
+
 const fetchPatients = async () => {
   const res = await api.get('/admin/patients');
   patients.value = res.data;
 };
 
-// NEW: Search Logic
+// Search Logic
 const filteredPatients = computed(() => {
     if (!searchQuery.value) return patients.value;
     const q = searchQuery.value.toLowerCase();
@@ -80,6 +109,7 @@ const filteredPatients = computed(() => {
     );
 });
 
+// Edit Logic
 const openEdit = (p) => {
     editingPatient.value = { ...p };
 };
@@ -94,6 +124,18 @@ const saveEdit = async () => {
         fetchPatients();
     } catch (err) {
         alert('Update failed');
+    }
+};
+
+// History Logic
+const openHistory = async (p) => {
+    viewingHistory.value = p;
+    historyData.value = []; // clear previous
+    try {
+        const res = await api.get(`/admin/patients/${p.id}/history`);
+        historyData.value = res.data;
+    } catch (err) {
+        alert('Could not fetch history');
     }
 };
 
