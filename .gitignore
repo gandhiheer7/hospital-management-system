@@ -3,6 +3,8 @@ venv/
 __pycache__/
 *.pyc
 *.sqlite3
+backend/instance/*.db
+backend/celerybeat-schedule*
 
 # Node
 node_modules/
@@ -10,18 +12,10 @@ dist/
 
 # Environment
 .env
+.flask_session/
+
+# Redis
+redis/
 
 # OS
 .DS_Store
-
-redis/
-
-backend/instance/hospital.db
-
-backend/celerybeat-schedule*
-
-redis/
-
-backend/instance/*.db
-
-backend/celerybeat-schedule*

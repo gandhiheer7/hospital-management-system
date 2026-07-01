@@ -82,7 +82,10 @@ def register():
         # 2. Create Patient Profile
         dob_date = None
         if dob_str:
-            dob_date = datetime.strptime(dob_str, '%Y-%m-%d').date()
+            try:
+                dob_date = datetime.strptime(dob_str, '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({'message': 'Invalid date format for dob. Use YYYY-MM-DD.'}), 400
 
         new_patient = Patient(
             user_id=new_user.id,
